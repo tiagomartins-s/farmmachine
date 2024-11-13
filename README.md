@@ -57,3 +57,6 @@ Este projeto consiste em um sistema de monitoramento e controle de irrigação u
 4. **Instalação das Dependências**  
    Execute o comando abaixo para instalar todas as bibliotecas necessárias:
    `streamlit run app.py`
+
+## Diagrama de circuito
+![Esquema de Conexão dos Sensores](imagens/diagrama-circuito.png)
