@@ -27,6 +27,8 @@ Este projeto consiste em um sistema de monitoramento e controle de irrigação u
 
 - `src/main.py`: Código principal da aplicação em Streamlit.
 - `src/sketch.ino`: Código em c com o diagrama de circuito.
+- `src/link_video.txt`: Link para o video explicativo no youtube.
+- `imagens/diagrama-circuito.png`: Imagem do diagrama de circuito.
 - `scripts/`: Pasta contendo o script `.sql` para criação da tabela no banco de dados Oracle.
 - `README.md`: Este arquivo, com as instruções de uso do projeto.
 
