@@ -60,4 +60,4 @@ Este projeto consiste em um sistema de monitoramento e controle de irrigação u
    `streamlit run app.py`
 
 ## Diagrama de circuito
-![Esquema de Conexão dos Sensores](imagens/diagrama-circuito.png)
+![Esquema de Conexão dos Sensores](imagens/diagrama-circuito.jpg)
