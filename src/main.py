@@ -4,7 +4,10 @@ import oracledb
 from sqlalchemy import create_engine
 import requests
 import matplotlib.pyplot as plt
-import os
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+import numpy as np
 
 # Configuração inicial do sistema
 st.set_page_config(page_title="Sistema de Irrigação Inteligente - Gestão Agrícola", layout="wide")
@@ -25,6 +28,58 @@ def conectar_bd():
 def carregar_dados(arquivo):
     return pd.read_excel(arquivo)
 
+# Função para carregar dados do banco
+def carregar_dados_banco():
+    conn = conectar_bd()
+    query = "SELECT * FROM DADOS_IRRIGACAO"
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+
+# Função para treinar o modelo preditivo
+def treinar_modelo(dados):
+    st.subheader("Treinamento do Modelo")
+
+    # Pré-processamento
+    dados['data_hora_coleta'] = pd.to_datetime(dados['DATA_HORA_COLETA'])
+    dados['dia'] = dados['data_hora_coleta'].dt.day
+    dados['mes'] = dados['data_hora_coleta'].dt.month
+    dados['ano'] = dados['data_hora_coleta'].dt.year
+
+    # Features e target
+    X = dados[['dia', 'mes', 'ano', 'VALOR_COLETA']]
+    y = dados['STATUS_RELE']
+
+    # Divisão em treino e teste
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Modelo
+    modelo = RandomForestClassifier(random_state=42)
+    modelo.fit(X_train, y_train)
+
+    return modelo
+
+
+# Função para prever a próxima semana
+def prever_proxima_semana(modelo):
+    st.subheader("Previsão para a Próxima Semana")
+    hoje = pd.Timestamp.now()
+    proximos_dias = pd.date_range(hoje, hoje + pd.Timedelta(days=7), freq='D')
+
+    previsoes = []
+    for dia in proximos_dias:
+        entrada = pd.DataFrame({
+            'dia': [dia.day],
+            'mes': [dia.month],
+            'ano': [dia.year],
+            'VALOR_COLETA': [np.random.uniform(10, 50)]  # Valores fictícios para previsão
+        })
+        previsao = modelo.predict(entrada)
+        previsoes.append({'Data': dia, 'Previsão Rele': previsao[0]})
+
+    previsoes_df = pd.DataFrame(previsoes)
+    st.write(previsoes_df)
 
 # Função para inserir dados no banco usando SQLAlchemy
 def inserir_dados(dados):
@@ -100,7 +155,7 @@ def obter_dados_api():
         return None
 
 # Menu principal
-menu = st.sidebar.selectbox("Menu", ["Importação de Dados", "CRUD e Visualização", "Análises e Gráficos"])
+menu = st.sidebar.selectbox("Menu", ["Importação de Dados", "CRUD e Visualização", "Análises e Gráficos", "Previsão Semana"])
 
 # Menu para Inserir Arquivo
 if menu == "Importação de Dados":
@@ -138,6 +193,16 @@ elif menu == "CRUD e Visualização":
             st.success(f"Registro {id_para_deletar} deletado com sucesso!")
 
 # Menu para Análises e Gráficos
+elif menu == "Previsão Semana":
+    st.subheader("Treinamento do Modelo Preditivo")
+    dados = carregar_dados_banco()
+    st.write("Dados carregados do banco:")
+    st.write(dados.head())
+
+    if st.button("Treinar Modelo"):
+        modelo = treinar_modelo(dados)
+        prever_proxima_semana(modelo)
+
 elif menu == "Análises e Gráficos":
     submenu = st.sidebar.selectbox("Selecione a Visão", ["Dados da API", "Dados do Banco de Dados"])
 

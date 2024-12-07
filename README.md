@@ -8,6 +8,7 @@ Este projeto consiste em um sistema de monitoramento e controle de irrigação u
 - **Controle automático do relé**: Acionamento do relé baseado em condições predefinidas.
 - **Visualização de dados**: Gráficos de temperatura e umidade coletados dos sensores e da API Open-Meteo.
 - **Operações CRUD**: Inserir, ler, atualizar e excluir dados de sensores diretamente no banco de dados Oracle.
+- **Previsão Semana**: Treina um modelo com os dados do banco e preve a próxima semana.
 
 ## Tecnologias Utilizadas
 
@@ -52,8 +53,8 @@ Este projeto consiste em um sistema de monitoramento e controle de irrigação u
    
 4. **Instalação das Dependências**  
    Execute o comando abaixo para instalar todas as bibliotecas necessárias:
-   `pip install streamlit pandas oracledb SQLAlchemy requests matplotlib openpyxl`
+   `pip install pandas streamlit oracledb SQLAlchemy matplotlib scikit-learn numpy requests`
 
 4. **Instalação das Dependências**  
    Execute o comando abaixo para instalar todas as bibliotecas necessárias:
-   `streamlit run app.py`
+   `streamlit run src/main.py`

@@ -1,4 +1,6 @@
 #include <DHT.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 #include <ctime>
 
 #define BUTTON_PHOSPHORUS 23    // Pino do botão de Fósforo
@@ -11,12 +13,15 @@
 // Inicializa o sensor DHT
 DHT dht(DHT_PIN, DHT22);  // Pino e tipo de sensor DHT (DHT22)
 
-unsigned long ultimoTempoColeta = 0; // Variável para armazenar o último tempo de coleta
-int ultimaLeituraLDR = 0;            // Variável para armazenar a última leitura do LDR
-float pH = 7.0;                      // Valor inicial do pH (neutro)
+// Inicializa o display LCD (endereço 0x27, tamanho 16x2)
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+unsigned long ultimoTempoColeta = 0;  // Variável para armazenar o último tempo de coleta (unsigned long é eficiente para tempos)
+byte ultimaLeituraLDR = 0;            // Variável para armazenar a última leitura do LDR (byte porque o valor é pequeno)
+int pH = 7;                          // Valor inicial do pH (não precisa de float, int é suficiente)
 bool reléStatus = false;             // Status do relé (false = desligado, true = ligado)
-String motivoAcionamento = "";       // Motivo do acionamento do relé (inicialmente vazio)
-int id_coleta = 1;                   // Identificador de coleta
+char motivoAcionamento[50] = "";     // Motivo do acionamento do relé (usando array de char em vez de String para economizar memória)
+byte id_coleta = 1;                   // Identificador de coleta (byte porque o número de coletas não vai ultrapassar 255)
 
 void setup() {
   Serial.begin(115200);
@@ -26,6 +31,13 @@ void setup() {
   pinMode(RELAY_PIN, OUTPUT); // Configura o pino do relé como saída
 
   dht.begin();  // Inicializa o sensor DHT
+
+  // Inicializa a comunicação I2C no ESP32
+  Wire.begin(5, 18); // SDA no pino 5, SCL no pino 18
+
+  // Configura o LCD
+  lcd.begin(16, 2);  // Inicializa o LCD com 16 colunas e 2 linhas
+  lcd.setBacklight(1);  // Liga o retroiluminado do LCD
 
   // Define a data e hora inicial manualmente (Ano, Mês, Dia, Hora, Minuto, Segundo)
   struct tm timeinfo;
@@ -42,23 +54,25 @@ void setup() {
   settimeofday(&now, NULL);  // Define o RTC para a data/hora inicial
 
   // Cabeçalho das colunas
-  Serial.println("ID Coleta   Item Coletado          Valor da Coleta   Data/Hora da Coleta        Status Rele  Motivo Acionamento");
+  Serial.println("ID_Coleta   Item_Coletado          Valor_Coleta   Data/Hora_Coleta        Status_Rele  Motivo_Acionamento");
   Serial.println("--------    -------------          ---------------   ---------------------      -----------  ------------------");
 }
 
 void loop() {
-  int phosphorusButtonState = digitalRead(BUTTON_PHOSPHORUS);
-  int potassiumButtonState = digitalRead(BUTTON_POTASSIUM);
+  byte phosphorusButtonState = digitalRead(BUTTON_PHOSPHORUS);  // Usando byte para economizar memória
+  byte potassiumButtonState = digitalRead(BUTTON_POTASSIUM);     // Usando byte para economizar memória
 
   if (phosphorusButtonState == LOW) {
-    int phosphorusValue = random(10, 101);
+    byte phosphorusValue = random(10, 101);  // Usando byte para o valor de fósforo
     printData("Fósforo", phosphorusValue);
+    displayLCD("Fósforo", phosphorusValue);  // Exibe no LCD
     delay(1000); // Pausa para evitar leituras múltiplas
   }
 
   if (potassiumButtonState == LOW) {
-    int potassiumValue = random(10, 101);
+    byte potassiumValue = random(10, 101);  // Usando byte para o valor de potássio
     printData("Potássio", potassiumValue);
+    displayLCD("Potássio", potassiumValue);  // Exibe no LCD
     delay(1000); // Pausa para evitar leituras múltiplas
   }
 
@@ -69,7 +83,7 @@ void loop() {
 
     // Leitura do sensor LDR
     int ldrValue = analogRead(LDR_PIN);
-    float lightIntensity = map(ldrValue, 0, 4095, 14, 0); // Mapeamento de LDR para pH
+    int lightIntensity = map(ldrValue, 0, 4095, 14, 0); // Usando int ao invés de float para economizar memória
 
     // Leitura do sensor DHT22 (Temperatura e Umidade)
     float temperatura = dht.readTemperature(); // Temperatura em Celsius
@@ -83,23 +97,24 @@ void loop() {
 
     // Exibe os dados de LDR
     printData("pH", lightIntensity);
+    displayLCD("pH", lightIntensity);  // Exibe no LCD
 
     // Exibe os dados de Temperatura e Umidade, incluindo data e hora da coleta
     printData("Temperatura", temperatura);
+    displayLCD("Temperatura", temperatura);  // Exibe no LCD
     printData("Umidade", umidade);
+    displayLCD("Umidade", umidade);  // Exibe no LCD
 
     // Verifica as condições para acionar o relé (todas as 3 condições devem ser atendidas)
-    motivoAcionamento = ""; // Deixa o motivo vazio quando o relé não for acionado
+    motivoAcionamento[0] = '\0';  // Deixa o motivo vazio quando o relé não for acionado
     if (lightIntensity > 10 && temperatura > 35 && umidade < 50) {
       reléStatus = true;
-      motivoAcionamento = "pH acima de 10, Temperatura acima de 35°C e Umidade abaixo de 50%";
+      strncpy(motivoAcionamento, "Temp>35-Umidade<50", sizeof(motivoAcionamento) - 1); // Usando strncpy para evitar overflow
       digitalWrite(RELAY_PIN, HIGH); // Aciona o relé
-      Serial.println("Relé acionado: pH acima de 10, Temperatura acima de 35°C e Umidade abaixo de 50%");
     } else {
       reléStatus = false;
-      motivoAcionamento = "";  // Deixa o motivo vazio quando o relé não for acionado
+      motivoAcionamento[0] = '\0';  // Deixa o motivo vazio quando o relé não for acionado
       digitalWrite(RELAY_PIN, LOW); // Desliga o relé
-      Serial.println("Relé desligado");
     }
 
     // Exibe os dados com o status do relé e o motivo do acionamento
@@ -117,12 +132,23 @@ void printData(const char* nutriente, float valor) {
     return;
   }
 
+  // Formata a data e hora no formato "YYYY-MM-DD-HH:MM:SS"
+  char dataHora[20];
+  snprintf(dataHora, sizeof(dataHora), "%04d-%02d-%02d-%02d:%02d:%02d",
+           timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+           timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+
   // Exibe a informação no formato de colunas no monitor serial, com o ID de coleta
-  Serial.printf("%-10d%-20s%-20.2f%-4d-%02d-%02d %02d:%02d:%02d  %-4d%-20s\n",
-                id_coleta++,
-                nutriente,
-                valor,
-                timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-                timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
-                reléStatus, motivoAcionamento.isEmpty() ? "" : motivoAcionamento.c_str());
+  Serial.printf("%-10d%-20s%-20.2f%-20s%-12s%-20s\n",
+                id_coleta, nutriente, valor, dataHora,
+                reléStatus ? "Ligado" : "Desligado", motivoAcionamento);
+  id_coleta++;  // Incrementa o ID de coleta para o próximo
+}
+
+void displayLCD(const char* nutriente, float valor) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(nutriente);
+  lcd.setCursor(0, 1);
+  lcd.print(valor);
 }
